@@ -120,10 +120,17 @@ export default function GitCheatSheet() {
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 p-6">
       <div className="max-w-4xl mx-auto">
-        <header className="text-center mb-8">
+      <header className="text-center mb-8">
+        <div className="flex items-center justify-center gap-2">
+          <img
+            src="https://git-scm.com/images/logos/downloads/Git-Icon-1788C.png" 
+            alt="Git Logo"
+            className="w-10 h-10" 
+          />
           <h1 className="text-3xl font-bold">Git Cheat Sheet</h1>
-          <p className="text-gray-400 mt-2">All the essential Git commands in one place.</p>
-        </header>
+        </div>
+        <p className="text-gray-400 mt-2">All the essential Git commands in one place.</p>
+      </header>
 
         <div className="mb-6 relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
@@ -170,9 +177,18 @@ export default function GitCheatSheet() {
 
         <footer className="text-center mt-8 text-sm text-gray-400">
           <p className="flex items-center justify-center">
-            Made with <Heart className="h-4 w-4 mx-1 text-red-500" /> by Yasharth Singh from CICR
+            Made with <Heart className="h-4 w-4 mx-1 text-red-500" /> by Yasharth Singh from{" "}
+            <a
+              href="https://cicr.in" // Replace with the actual URL if available
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-400 hover:text-blue-300 ml-1"
+            >
+              CICR 
+            </a>
+             -The Robotics Club of JIIT-128
           </p>
-        </footer>
+        </footer> 
       </div>
     </div>
   )
