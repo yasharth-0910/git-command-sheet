@@ -12,7 +12,9 @@ app.use(express.json());
 const allowedOrigins = [
   "http://localhost:3000", 
   "http://localhost:5173",
-  "https://git.cicr.in" // Add your Vercel domain
+  "https://git.cicr.in",
+  "git-command-sheet.vercel.app"
+ // Add your Vercel domain
 ];
 const corsOptions = {
   origin: function (origin, callback) {
