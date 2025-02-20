@@ -1,9 +1,23 @@
 "use client"
 
 import { useState } from "react"
-import { Copy, Search, Heart, Check } from "lucide-react"
+import { Copy, Search, Heart, Check, Terminal } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+  Command,
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
+import { Separator } from "@/components/ui/separator"
+import { Badge } from "@/components/ui/badge"
+
+import { useEffect } from "react"
 
 interface Command {
   code: string
@@ -96,100 +110,289 @@ const gitCommands: Section[] = [
 ]
 
 export default function GitCheatSheet() {
-  const [searchQuery, setSearchQuery] = useState("")
-  const [copiedCommand, setCopiedCommand] = useState<string | null>(null)
+  const [searchValue, setSearchValue] = useState("")
+  const [open, setOpen] = useState(false)
 
+  // Remove searchQuery state since we'll use searchValue instead
+  const [copiedCommand, setCopiedCommand] = useState<string | null>(null);
+  const [commandInput, setCommandInput] = useState("");
+  const [commandOutput, setCommandOutput] = useState<string[]>([]);
+
+  // Update the filtered commands to use searchValue
   const filteredCommands = gitCommands
     .map((section) => ({
       ...section,
       commands: section.commands.filter(
         (command) =>
-          command.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          command.description.toLowerCase().includes(searchQuery.toLowerCase()),
+          command.code.toLowerCase().includes(searchValue.toLowerCase()) ||
+          command.description.toLowerCase().includes(searchValue.toLowerCase()),
       ),
     }))
-    .filter((section) => section.commands.length > 0)
+    .filter((section) => section.commands.length > 0);
 
+  // Add keyboard shortcut effect
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault()
+        setOpen((open) => !open)
+      }
+    }
+    document.addEventListener("keydown", down)
+    return () => document.removeEventListener("keydown", down)
+  }, [])
+
+  // Initialize sandbox
+  // Add near the top of your file, after imports
+  const API_URL = import.meta.env.VITE_API_URL;
+  
+  // Then update all fetch calls to use API_URL
+  const initializeSandbox = async () => {
+    try {
+      const response = await fetch(`${API_URL}/init-sandbox`, {
+        method: "POST",
+      });
+      const data = await response.json();
+      if (data.success) {
+        console.log("Sandbox initialized:", data.sandboxDir);
+      }
+    } catch (error) {
+      console.error("Error initializing sandbox:", error);
+    }
+  };
+  const executeCommand = async (command: string) => {
+    // Allow both git and basic shell commands
+    const allowedCommands = ['git', 'ls', 'pwd', 'cd', 'mkdir', 'touch'];
+    const commandParts = command.split(' ');
+    const baseCommand = commandParts[0];
+
+    if (!allowedCommands.includes(baseCommand)) {
+      console.error("Invalid command format:", command);
+      setCommandOutput((prev) => [...prev, `$ ${command}`, "Error: Command not allowed. Allowed commands: ${allowedCommands.join(', ')}"]);
+      return;
+    }
+  
+    console.log("Sending command:", command);
+  
+    try {
+      const response = await fetch(`${API_URL}/execute-command`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ command }),
+      });
+  
+      const data = await response.json();
+      console.log("Response received:", data);
+  
+      if (data.success) {
+        setCommandOutput((prev) => [...prev, `$ ${command}`, data.output]);
+      } else {
+        setCommandOutput((prev) => [...prev, `$ ${command}`, `Error: ${data.error}`]);
+      }
+    } catch (error) {
+      console.error("Fetch error:", error);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      setCommandOutput((prev) => [...prev, `$ ${command}`, `Error: ${errorMessage}`]);
+    }
+  };
+  
+  // Clean up sandbox
+  const cleanupSandbox = async () => {
+    try {
+      await fetch(`${API_URL}/cleanup-sandbox`, {
+        method: "POST",
+      });
+    } catch (error) {
+      console.error("Error cleaning up sandbox:", error);
+    }
+  };
+
+  // Initialize sandbox on component mount
+  useEffect(() => {
+    initializeSandbox();
+    return () => {
+      cleanupSandbox();
+    };
+  }, []);
+
+  // Handle command input
+  const handleCommandSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!commandInput.trim()) return;
+
+    executeCommand(commandInput);
+    setCommandInput("");
+  };
+
+  // Copy command to clipboard
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text).then(() => {
-      setCopiedCommand(text)
-      setTimeout(() => setCopiedCommand(null), 1000) // Reset after 1 second
-    })
-  }
+      setCopiedCommand(text);
+      setTimeout(() => setCopiedCommand(null), 1000); // Reset after 1 second
+    });
+  };
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 p-6">
-      <div className="max-w-4xl mx-auto">
-      <header className="text-center mb-8">
-        <div className="flex items-center justify-center gap-2">
-          <img
-            src="https://git-scm.com/images/logos/downloads/Git-Icon-1788C.png" 
-            alt="Git Logo"
-            className="w-10 h-10" 
-          />
-          <h1 className="text-3xl font-bold">Git Cheat Sheet</h1>
-        </div>
-        <p className="text-gray-400 mt-2">All the essential Git commands in one place.</p>
-      </header>
+      <div className="max-w-6xl mx-auto space-y-8">
+        <header className="text-center space-y-4">
+          <div className="flex items-center justify-center gap-3">
+            <img
+              src="https://git-scm.com/images/logos/downloads/Git-Icon-1788C.png" 
+              alt="Git Logo"
+              className="w-12 h-12" 
+            />
+            <h1 className="text-4xl font-bold tracking-tight">Git Cheat Sheet</h1>
+          </div>
+          <p className="text-gray-400 text-lg">All the essential Git commands in one place.</p>
+          <Separator className="my-4 bg-gray-800" />
+        </header>
 
-        <div className="mb-6 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-          <Input
-            type="text"
-            placeholder="Search commands..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 bg-gray-900 border-gray-800 text-gray-100"
-          />
+        {/* Command Search Bar - keeping existing code */}
+        <div className="mb-8">
+          <Button
+            variant="outline"
+            className="relative w-full justify-start text-sm text-muted-foreground bg-gray-900 border-gray-800"
+            onClick={() => setOpen(true)}
+          >
+            <Search className="mr-2 h-4 w-4" />
+            <span>Search Git commands...</span>
+            <kbd className="pointer-events-none absolute right-2 top-2 hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex">
+              <span className="text-xs">⌘</span>K
+            </kbd>
+          </Button>
         </div>
 
-        {filteredCommands.map((section) => (
-          <section key={section.title} className="mb-6">
-            <h2 className="text-xl font-semibold mb-4">{section.title}</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {section.commands.map((command) => (
-                <div
-                  key={command.code}
-                  className="bg-gray-900 text-gray-100 p-4 rounded-lg border border-gray-800"
-                >
-                  <div className="flex justify-between items-center">
-                    <code className="font-mono text-sm bg-gray-800 p-2 rounded">{command.code}</code>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => copyToClipboard(command.code)}
-                      className="text-gray-400 hover:text-gray-100"
+        {/* Command Search Dialog - Updated styling */}
+        <CommandDialog open={open} onOpenChange={setOpen}>
+          <Command className="bg-gray-950 border-gray-800 rounded-xl shadow-2xl">
+            <CommandInput 
+              placeholder="Type a git command or search by description..." 
+              value={searchValue}
+              onValueChange={setSearchValue}
+              className="text-gray-100 border-b border-gray-800"
+            />
+            <CommandList className="text-gray-100 scrollbar-hide max-h-[400px] p-2">
+              <CommandEmpty className="text-gray-400 p-4 text-center">
+                No Git commands found.
+              </CommandEmpty>
+              {filteredCommands.map((section) => (
+                <CommandGroup key={section.title} heading={section.title} className="text-gray-400">
+                  {section.commands.map((command) => (
+                    <CommandItem
+                      key={command.code}
+                      value={command.code}
+                      onSelect={() => {
+                        setOpen(false)
+                        setSearchValue(command.code)
+                      }}
+                      className="text-gray-100 hover:bg-gray-800/60 rounded-lg my-1 cursor-pointer"
                     >
-                      {copiedCommand === command.code ? (
-                        <Check className="h-4 w-4 text-green-500" />
-                      ) : (
-                        <Copy className="h-4 w-4" />
-                      )}
-                      <span className="sr-only">Copy to clipboard</span>
-                    </Button>
-                  </div>
-                  <p className="mt-2 text-sm text-gray-400">{command.description}</p>
-                </div>
+                      <Terminal className="mr-2 h-4 w-4 text-gray-400" />
+                      <span className="font-mono">{command.code}</span>
+                      <span className="ml-2 text-gray-400">
+                        {command.description}
+                      </span>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
               ))}
-            </div>
-          </section>
-        ))}
+            </CommandList>
+          </Command>
+        </CommandDialog>
 
-        <footer className="text-center mt-8 text-sm text-gray-400">
-          <p className="flex items-center justify-center">
-            Made with <Heart className="h-4 w-4 mx-1 text-red-500" /> by Yasharth Singh from{" "}
+        {/* Command Sandbox with Card */}
+        <Card className="bg-gray-900 border-gray-800 mb-12">
+          <CardHeader className="border-b border-gray-800">
+            <CardTitle className="text-xl font-semibold flex items-center gap-2">
+              <Terminal className="h-5 w-5" />
+              Command Sandbox
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <form onSubmit={handleCommandSubmit} className="flex gap-2">
+              <Input
+                type="text"
+                placeholder="Enter a Git command..."
+                value={commandInput}
+                onChange={(e) => setCommandInput(e.target.value)}
+                className="flex-1 bg-gray-800 border-gray-700 text-gray-100"
+              />
+              <Button type="submit" variant="secondary">
+                Run
+              </Button>
+            </form>
+            {commandOutput.length > 0 && (
+              <div className="mt-4">
+                <pre className="bg-gray-800 p-4 rounded-lg text-sm text-gray-100 overflow-x-auto">
+                  {commandOutput.join("\n")}
+                </pre>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Updated Cheat Sheet Sections */}
+        <div className="space-y-6">
+          {filteredCommands.map((section) => (
+            <div key={section.title} className="space-y-4">
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl font-semibold">{section.title}</h2>
+                <Badge variant="secondary" className="text-xs bg-gray-800 text-gray-300">
+                  {section.commands.length}
+                </Badge>
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {section.commands.map((command) => (
+                  <div
+                    key={command.code}
+                    className="group bg-gradient-to-br from-gray-900 to-gray-800/50 p-4 rounded-xl border border-gray-800/50 hover:border-gray-700 transition-all duration-300 hover:shadow-lg hover:shadow-gray-900/20 backdrop-blur-sm"
+                  >
+                    <div className="flex items-center justify-between gap-4">
+                      <code className="font-mono text-sm bg-black/30 px-3 py-1.5 rounded-lg flex-1 overflow-x-auto scrollbar-hide">
+                        {command.code}
+                      </code>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => copyToClipboard(command.code)}
+                        className="opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-gray-800/50"
+                      >
+                        {copiedCommand === command.code ? (
+                          <Check className="h-4 w-4 text-green-500" />
+                        ) : (
+                          <Copy className="h-4 w-4 text-gray-400 hover:text-gray-100" />
+                        )}
+                      </Button>
+                    </div>
+                    <p className="mt-3 text-sm text-gray-400 leading-relaxed">
+                      {command.description}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Footer with Separator */}
+        <Separator className="my-8 bg-gray-800" />
+        <footer className="text-center text-sm text-gray-400 pb-8">
+          <p className="flex items-center justify-center gap-1">
+            Made with <Heart className="h-4 w-4 text-red-500" /> by Yasharth Singh from{" "}
             <a
-              href="https://cicr.in" // Replace with the actual URL if available
+              href="https://cicr.in"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-blue-400 hover:text-blue-300 ml-1"
+              className="text-blue-400 hover:text-blue-300 underline-offset-4 hover:underline"
             >
-              CICR 
+              CICR
             </a>
-             -The Robotics Club of JIIT-128
+            -The Robotics Club of JIIT-128
           </p>
-        </footer> 
+        </footer>
       </div>
     </div>
-  )
+  );
 }
+
