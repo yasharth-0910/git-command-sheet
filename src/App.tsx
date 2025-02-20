@@ -147,6 +147,9 @@ export default function GitCheatSheet() {
   const API_URL = import.meta.env.VITE_API_URL;
   
   // Then update all fetch calls to use API_URL
+  const [sessionId, setSessionId] = useState<string | null>(null);
+
+  // Initialize sandbox
   const initializeSandbox = async () => {
     try {
       const response = await fetch(`${API_URL}/init-sandbox`, {
@@ -154,12 +157,14 @@ export default function GitCheatSheet() {
       });
       const data = await response.json();
       if (data.success) {
+        setSessionId(data.sessionId);
         console.log("Sandbox initialized:", data.sandboxDir);
       }
     } catch (error) {
       console.error("Error initializing sandbox:", error);
     }
   };
+
   const executeCommand = async (command: string) => {
     // Allow both git and basic shell commands
     const allowedCommands = ['git', 'ls', 'pwd', 'cd', 'mkdir', 'touch'];
@@ -178,7 +183,7 @@ export default function GitCheatSheet() {
       const response = await fetch(`${API_URL}/execute-command`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ command }),
+        body: JSON.stringify({ command, sessionId }),
       });
   
       const data = await response.json();
@@ -198,12 +203,16 @@ export default function GitCheatSheet() {
   
   // Clean up sandbox
   const cleanupSandbox = async () => {
-    try {
-      await fetch(`${API_URL}/cleanup-sandbox`, {
-        method: "POST",
-      });
-    } catch (error) {
-      console.error("Error cleaning up sandbox:", error);
+    if (sessionId) {
+      try {
+        await fetch(`${API_URL}/cleanup-sandbox`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId }),
+        });
+      } catch (error) {
+        console.error("Error cleaning up sandbox:", error);
+      }
     }
   };
 
