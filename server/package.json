@@ -14,7 +14,7 @@
     "cors": "^2.8.5",
     "express": "^4.21.2",
     "nodemon": "^3.1.9",
-    "simplegit": "^1.0.2"
+    "simple-git": "^3.22.0"
   },
   "engines": {
     "node": ">=18.0.0"
